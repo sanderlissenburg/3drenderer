@@ -4,14 +4,13 @@
 #include <SDL2/SDL.h>
 #include "display.h"
 #include "vector.h"
+#include "mesh.h"
 
 bool is_running = false;
 
-const int N_POINTS = 9*9*9;
-vect3_t cube_points[N_POINTS];
-vect2_t projected_points[N_POINTS];
-vect3_t cube_rotation = {0, 0, 0};
+triangle_t triangles_to_render[N_MESH_FACES];
 
+vect3_t cube_rotation = {0, 0, 0};
 float fov_factor = 512;
 vect3_t camera_position = {0, 0, -5};
 
@@ -27,20 +26,6 @@ void setup(void) {
         window_width,
         window_height
     );
-
-    int i = 0;
-
-    float step = 0.25;
-
-    for (float x = -1.0; x <= 1.0; x += step ) {
-        for (float y = -1.0; y <= 1.0; y += step ) {
-            for (float z = -1.0; z <= 1.0; z += step ) {
-                vect3_t point = { x, y, z};
-                cube_points[i] = point;
-                i++;
-            }
-        }
-    }
 }
 
 void process_input(void) {
@@ -82,17 +67,34 @@ void update(void) {
     cube_rotation.y += 0.01;
     cube_rotation.z += 0.01;
 
-    for (int i = 0; i < N_POINTS; i++) {
-        vect3_t point = cube_points[i];
+    for (int i = 0; i < N_MESH_FACES; i++) {
+        face_t mesh_face = mesh_faces[i];
 
-        vect3_t transformed_point = vect3_rotate_x(point, cube_rotation.x);
-        transformed_point = vect3_rotate_y(transformed_point, cube_rotation.y);
-        transformed_point = vect3_rotate_z(transformed_point, cube_rotation.z);
+        vect3_t face_vertices[3];
 
-        transformed_point.z -= camera_position.z;
+        face_vertices[0] = mesh_vertices[mesh_face.a - 1];
+        face_vertices[1] = mesh_vertices[mesh_face.b - 1];
+        face_vertices[2] = mesh_vertices[mesh_face.c - 1];
         
-        vect2_t projected_point = project(transformed_point);
-        projected_points[i] = projected_point;
+        triangle_t projected_triangle;
+
+        for (int j = 0; j < 3; j++) {
+            vect3_t transformed_vertex = face_vertices[j];
+
+            transformed_vertex = vect3_rotate_x(transformed_vertex, cube_rotation.x);
+            transformed_vertex = vect3_rotate_y(transformed_vertex, cube_rotation.y);
+            transformed_vertex = vect3_rotate_z(transformed_vertex, cube_rotation.z);
+
+            transformed_vertex.z -= camera_position.z;
+
+            vect2_t projected_point = project(transformed_vertex);
+            projected_point.x += window_width/2, 
+            projected_point.y += window_height/2, 
+            
+            projected_triangle.points[j] = projected_point;
+        }
+
+        triangles_to_render[i] = projected_triangle;
     }
 }
 
@@ -103,21 +105,43 @@ void render(void) {
     draw_grid(0xFFCCCCCC, false);
     //draw_rect(750, 550, 200, 200, 0xFFFF0000);
 
-    for (int i = 0; i < N_POINTS; i++) {
-        vect2_t projected_point = projected_points[i];
-        draw_rect(
-            projected_point.x + window_width/2, 
-            projected_point.y + window_height/2, 
-            4, 
-            4, 
-            0xFFFF0000
-        );
+    //draw_line(40, 40, 300, 100);
+
+    for (int i = 0; i < N_MESH_FACES; i++) {
+
+        triangle_t triangle_to_render = triangles_to_render[i];
+
+        for (int j = 0; j < 3; j++) {
+            vect2_t projected_point = triangle_to_render.points[j];
+            draw_rect(
+                projected_point.x,
+                projected_point.y, 
+                4,
+                4, 
+                0xFFFF0000
+            );
+            if (j < 2) {
+                draw_line(
+                    projected_point.x, 
+                    projected_point.y, 
+                    triangle_to_render.points[j+1].x,
+                    triangle_to_render.points[j+1].y
+                ); 
+            } else {
+                draw_line(
+                    projected_point.x, 
+                    projected_point.y, 
+                    triangle_to_render.points[0].x,
+                    triangle_to_render.points[0].y
+                ); 
+            }
+            
+        }
     }
 
     render_color_buffer();
 
     clear_color_buffer(0xFF000000);
-
 
     SDL_RenderPresent(renderer);    
 }

@@ -25,7 +25,9 @@ void clear_color_buffer(u_int32_t color);
 
 void draw_grid(int color, bool grid);
 
-void draw_pixel(int x, int y, int32_t colo);
+void draw_pixel(int x, int y, int32_t color);
+
+void draw_line(int x0, int y0, int x1, int y1);
 
 void draw_rect(int x, int y, int width, int height, int32_t color);
 
